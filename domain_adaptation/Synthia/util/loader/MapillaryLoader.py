@@ -1,0 +1,294 @@
+import os
+import os.path as osp
+import numpy as np
+import random
+import matplotlib.pyplot as plt
+import collections
+import torch
+import torchvision
+from torch.utils import data
+from PIL import Image, ImageFile
+from .augmentations import *
+ImageFile.LOAD_TRUNCATED_IMAGES = True
+
+ignore_label = 255
+'''
+valid_colors = [[128,  64, 128],
+                [244,  35, 232],
+                [ 70,  70,  70],
+                [102, 102, 156],
+                [190, 153, 153],
+                [153, 153, 153],
+                [250, 170,  30],
+                [220, 220,   0],
+                [107, 142,  35],
+                [152, 251, 152],
+                [ 70, 130, 180],
+                [220,  20,  60],
+                [255,   0,   0],
+                [  0,   0, 142],
+                [  0,   0,  70],
+                [  0,  60, 100],
+                [  0,  80, 100],
+                [  0,   0, 230],
+                [119,  11,  32]]
+'''
+valid_colors = [[128,  64, 128], # Road, 0
+                [244,  35, 232], # Sidewalk, 1
+                [ 70,  70,  70], # Building, 2
+                [102, 102, 156], # Wall, 3
+                [190, 153, 153], # Fence, 4
+                [153, 153, 153], # pole, 5
+                [250, 170,  30], # traffic light, 6
+                [220, 220,   0], # traffic sign, 7
+                [107, 142,  35], # vegetation, 8
+                [ 70, 130, 180], # sky, 9
+                [220,  20,  60], # person, 10
+                [255,   0,   0], # rider, 11
+                [  0,   0, 142], # car, 12
+                [  0,  60, 100], # bus, 13
+                [  0,   0, 230], # motor-bike, 14
+                [119,  11,  32]] # bike, 15
+label_colours = dict(zip(range(16), valid_colors))
+
+id_to_ignore_or_group = {}
+
+
+def gen_id_to_ignore():
+    global id_to_ignore_or_group
+    for i in range(66):
+        id_to_ignore_or_group[i] = ignore_label
+
+    ### Convert each class to cityscapes one
+    ### Road
+    # Road
+    id_to_ignore_or_group[13] = 0
+    # Lane Marking - General
+    id_to_ignore_or_group[24] = 0
+    # Manhole
+    id_to_ignore_or_group[41] = 0
+
+    ### Sidewalk
+    # Curb
+    id_to_ignore_or_group[2] = 1
+    # Sidewalk
+    id_to_ignore_or_group[15] = 1
+
+    ### Building
+    # Building
+    id_to_ignore_or_group[17] = 2
+
+    ### Wall
+    # Wall
+    id_to_ignore_or_group[6] = 3
+
+    ### Fence
+    # Fence
+    id_to_ignore_or_group[3] = 4
+
+    ### Pole
+    # Pole
+    id_to_ignore_or_group[45] = 5
+    # Utility Pole
+    id_to_ignore_or_group[47] = 5
+
+    ### Traffic Light
+    # Traffic Light
+    id_to_ignore_or_group[48] = 6
+
+    ### Traffic Sign
+    # Traffic Sign
+    id_to_ignore_or_group[50] = 7
+
+    ### Vegetation
+    # Vegitation
+    id_to_ignore_or_group[30] = 8
+
+    ### Terrain
+    # Terrain
+    #id_to_ignore_or_group[29] = 9
+
+    ### Sky
+    # Sky
+    id_to_ignore_or_group[27] = 9
+
+    ### Person
+    # Person
+    id_to_ignore_or_group[19] = 10
+
+    ### Rider
+    # Bicyclist
+    id_to_ignore_or_group[20] = 11
+    # Motorcyclist
+    id_to_ignore_or_group[21] = 11
+    # Other Rider
+    id_to_ignore_or_group[22] = 11
+
+    ### Car
+    # Car
+    id_to_ignore_or_group[55] = 12
+
+    ### Truck
+    # Truck
+    #id_to_ignore_or_group[61] = 14
+
+    ### Bus
+    # Bus
+    id_to_ignore_or_group[54] = 13
+
+    ### Train
+    # On Rails
+    #id_to_ignore_or_group[58] = 16
+
+    ### Motorcycle
+    # Motorcycle
+    id_to_ignore_or_group[57] = 14
+
+    ### Bicycle
+    # Bicycle
+    id_to_ignore_or_group[52] = 15
+
+class MapillaryLoader(data.Dataset):
+	def __init__(self, root, img_list_path, lbl_list_path, max_iters=None, crop_size=None, mean=(128, 128, 128), transform=None, set='validation', return_name = False, use_pseudo = False):
+		gen_id_to_ignore()
+		self.n_classes = 16
+		self.root = root
+		self.crop_size = crop_size
+		self.mean = mean
+		self.transform = transform
+		self.return_name = return_name
+		self.use_pseudo = use_pseudo
+		# self.mean_bgr = np.array([104.00698793, 116.66876762, 122.67891434])
+		self.img_ids = [i_id.strip() for i_id in open(img_list_path)]
+		self.lbl_ids = [i_id.strip() for i_id in open(lbl_list_path)]
+		#if self.use_pseudo:
+			#self.pseudo_lbl_ids = [i_id.strip() for i_id in open(img_list_path)]
+
+		if not max_iters==None:
+		   self.img_ids = self.img_ids * int(np.ceil(float(max_iters) / len(self.img_ids)))
+		   self.lbl_ids = self.lbl_ids * int(np.ceil(float(max_iters) / len(self.lbl_ids)))
+		   #if self.use_pseudo:
+			   #self.pseudo_lbl_ids = self.pseudo_lbl_ids * int(np.ceil(float(max_iters) / len(self.pseudo_lbl_ids)))
+
+
+		self.files = []
+		'''
+		self.id_to_trainid = {7: 0, 8 : 1, 11: 2, 12: 3, 13: 4 , 17: 5,
+				     19: 6, 20: 7, 21: 8, 22: 9, 23: 10, 24: 11, 25: 12,
+				     26: 13,27:14, 28:15, 31:16, 32: 17, 33: 18}
+		'''
+		self.set = set
+		# for split in ["train", "trainval", "val"]:
+		for img_name, lbl_name in zip(self.img_ids, self.lbl_ids):
+			#img_file = osp.join(self.root, "images/%s/%s" % (self.set, img_name))
+			#lbl_file = osp.join(self.root, "gtFine/%s/%s" % (self.set, lbl_name))
+			img_file = osp.join(self.root, "%s/images/%s" % (self.set, img_name) + ".jpg")
+			lbl_file = osp.join(self.root, "%s/labels/%s"% (self.set, lbl_name) + ".png")
+			if self.use_pseudo:
+				pseudo_name = img_name.split('/')[-1]
+				pseudo_lbl_file = osp.join(self.root, "pseudo_train_stg1_MS_tgt_hrnet/%s" % (pseudo_name))
+				self.files.append({
+					"img": img_file,
+					"label": lbl_file,
+					"pseudo_label": pseudo_lbl_file,
+					"name": img_name
+				})
+			else:
+				self.files.append({
+					"img": img_file,
+					"label": lbl_file,
+					"name": img_name
+				})
+
+	def __len__(self):
+		return len(self.files)
+
+	def __getitem__(self, index):
+		datafiles = self.files[index]
+
+		image = Image.open(datafiles["img"]).convert('RGB')
+		label = Image.open(datafiles["label"])
+		if self.use_pseudo:
+			pseudo_label = Image.open(datafiles["pseudo_label"])
+		name = datafiles["name"]
+
+		# resize
+		if self.crop_size != None:
+			image = image.resize((self.crop_size[1], self.crop_size[0]), Image.BICUBIC)
+			label = label.resize((self.crop_size[1], self.crop_size[0]), Image.NEAREST)
+			if self.use_pseudo:
+				pseudo_label = pseudo_label.resize((self.crop_size[1], self.crop_size[0]), Image.NEAREST)
+
+		# transform
+		if self.transform != None:
+			if self.use_pseudo:
+				image, label, pseudo_label = self.transform(image, label, pseudo_label)
+			else:
+				image, label = self.transform(image, label)
+
+		image = np.asarray(image, np.float32)
+		image = image[:, :, ::-1]  # change to BGR
+		image -= self.mean
+		image = image.transpose((2, 0, 1)) / 128.0
+
+		if not self.use_pseudo:
+			label = np.asarray(label, np.compat.long)
+
+			# re-assign labels to match the format of Cityscapes
+			label_copy = 255 * np.ones(label.shape, dtype=np.compat.long)
+			for k, v in id_to_ignore_or_group.items():
+				label_copy[label == k] = v
+
+			if not self.return_name:
+				return image.copy(), label_copy.copy()
+			else:
+				return image.copy(), label_copy.copy(), name
+		else:
+			label = np.asarray(label, np.compat.long)
+			pseudo_label = np.asarray(pseudo_label, np.compat.long)
+
+			# re-assign labels to match the format of Cityscapes
+			label_copy = 255 * np.ones(label.shape, dtype=np.compat.long)
+			for k, v in id_to_ignore_or_group.items():
+				label_copy[label == k] = v
+
+			pseudo_label_copy = 255 * np.ones(pseudo_label.shape, dtype=np.compat.long)
+			for v in range(self.n_classes):
+				pseudo_label_copy[pseudo_label == v] = v
+
+
+			if not self.return_name:
+				return image.copy(), label_copy.copy(), pseudo_label_copy.copy()
+			else:
+				return image.copy(), label_copy.copy(), pseudo_label_copy.copy(), name
+
+	def decode_segmap(self, img):
+		map = np.zeros((img.shape[0], img.shape[1], img.shape[2], 3))
+		for idx in range(img.shape[0]):
+			temp = img[idx, :, :]
+			r = temp.copy()
+			g = temp.copy()
+			b = temp.copy()
+			for l in range(0, self.n_classes):
+				r[temp == l] = label_colours[l][0]
+				g[temp == l] = label_colours[l][1]
+				b[temp == l] = label_colours[l][2]
+	
+			rgb = np.zeros((temp.shape[0], temp.shape[1], 3))
+			rgb[:, :, 0] = r / 255.0
+			rgb[:, :, 1] = g / 255.0
+			rgb[:, :, 2] = b / 255.0
+			map[idx, :, :, :] = rgb
+		return map
+
+if __name__ == '__main__':
+	dst = GTA5DataSet("./data", is_transform=True)
+	trainloader = data.DataLoader(dst, batch_size=4)
+	for i, data in enumerate(trainloader):
+		imgs, labels = data
+		if i == 0:
+			img = torchvision.utils.make_grid(imgs).numpy()
+			img = np.transpose(img, (1, 2, 0))
+			img = img[:, :, ::-1]
+			plt.imshow(img)
+			plt.show()
