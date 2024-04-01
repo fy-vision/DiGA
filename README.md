@@ -44,7 +44,7 @@ Please go to ./domain_generalization folder
 cd domain_generalization
 ```
 
-and refer to [domain generalization/README.md](domain generaliztion/README.md)
+and refer to [domain_generalization/README.md](domain_generaliztion/README.md)
 
 ### Running DiGA Scripts for Semi-Supervised Semantic Segmentation:
 Please go to ./semi-supervised segmentation folder
