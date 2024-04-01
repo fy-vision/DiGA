@@ -26,10 +26,10 @@ pip install -r requirements.txt -f https://download.pytorch.org/whl/torch_stable
 ```
 
 ### Running DiGA Scripts for Unsupervised Domain Adaptation:
-Please go to ./domain adaptation folder
+Please go to ./domain_adaptation folder
 
 ```shell
-cd "domain adaptation"
+cd domain_adaptation
 ```
 
 If you are looking for a specific adaptation benchmark e.g. Synthia->Cityscapes, please go to ./Synthia folder and refer to [domain adaptation/Synthia/README.md](domain adaptation/Synthia/README.md) 
@@ -38,10 +38,10 @@ If you are looking for a specific adaptation benchmark e.g. Synthia->Cityscapes,
 cd Synthia
 ```
 ### Running DiGA Scripts for Domain Generalization:
-Please go to ./domain generalization folder
+Please go to ./domain_generalization folder
 
 ```shell
-cd "domain generalization"
+cd domain_generalization
 ```
 
 and refer to [domain generalization/README.md](domain generaliztion/README.md)
@@ -50,10 +50,10 @@ and refer to [domain generalization/README.md](domain generaliztion/README.md)
 Please go to ./semi-supervised segmentation folder
 
 ```shell
-cd "semi-supervised segmentation"
+cd semi-supervised_segmentation
 ```
 
-and refer to [semi-supervised segmentation/README.md](semi-supervised segmentation/README.md)
+and refer to [semi-supervised_segmentation/README.md](semi-supervised_segmentation/README.md)
 
 
 ## Citation
