@@ -32,7 +32,7 @@ Please go to ./domain_adaptation folder
 cd domain_adaptation
 ```
 
-If you are looking for a specific adaptation benchmark e.g. Synthia->Cityscapes, please go to ./Synthia folder and refer to [domain adaptation/Synthia/README.md](domain adaptation/Synthia/README.md) 
+If you are looking for a specific adaptation benchmark e.g. Synthia->Cityscapes, please go to ./Synthia folder and refer to [domain adaptation/Synthia/README.md](domain_adaptation/Synthia/README.md) 
 
 ```shell
 cd Synthia
@@ -44,7 +44,7 @@ Please go to ./domain_generalization folder
 cd domain_generalization
 ```
 
-and refer to [domain_generalization/README.md](domain_generaliztion/README.md)
+and refer to [domain_generalization/README.md](domain_generalization/README.md)
 
 ### Running DiGA Scripts for Semi-Supervised Semantic Segmentation:
 Please go to ./semi-supervised segmentation folder
